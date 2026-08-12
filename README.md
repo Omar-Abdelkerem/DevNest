@@ -147,3 +147,19 @@ This project is licensed under the ISC license.
 ## Status
 
 This repository is a backend-focused DevNest application intended to support a portfolio platform with a structured API foundation.
+
+## Environment Variables
+
+Create a `.env` file in the project root and add your environment variables:
+
+```env
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+DB_NAME=devnest_db
+
+DATABASE_URL="postgresql://your_database_user:your_database_password@localhost:5432/devnest_db"
+
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=30d
+PORT=3000
+```
