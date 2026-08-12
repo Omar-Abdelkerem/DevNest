@@ -1,0 +1,230 @@
+### DevNest API — Request Collection
+### Use with VS Code "REST Client" extension (humao.rest-client) or JetBrains' built-in HTTP client.
+### Click "Send Request" above any request block below. No Postman needed.
+
+@baseUrl = http://localhost:3000/api/v1
+
+### Variables you'll fill in as you test — update these after each relevant request.
+### Tip: after a login/register response comes back, copy the token/id into these lines.
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3NzEzMWQ4ZC1hYzk0LTRjNDMtODc2Yy04Mjc0NzQ2NjM4MGUiLCJpYXQiOjE3ODYxNzUyNDksImV4cCI6MTc4ODc2NzI0OX0.7dIOljpbTQrWFm-t8gENMKz3gdN5dewpLFNhtIs_dUo
+@userId = 77131d8d-ac94-4c43-876c-82747466380e
+@otherUserId = 0ba5faae-9ba5-46f0-921e-f9a536890c51
+@projectId = c79154f9-58af-4b44-8b2b-9cf36a32c274
+@skillId = 08de9af2-06c6-44c0-94c0-75ab40a3b630
+@commentId = PASTE_COMMENT_ID_HERE
+@username = omar_test
+
+###############################################
+### AUTH
+###############################################
+
+### Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "omar_test2",
+  "email": "omar_test2@example.com",
+  "password": "SuperSecret123!"
+}
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "omar_test@example.com",
+  "password": "SuperSecret123!"
+}
+
+### ^ After running login, copy the "token" value from the response into @token above.
+
+###############################################
+### USER
+###############################################
+
+### Get current user (me)
+GET {{baseUrl}}/user/me
+Authorization: Bearer {{token}}
+
+### Update current user (me)
+PATCH {{baseUrl}}/user/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bio": "Backend dev, Prisma enjoyer."
+}
+
+### Get another user's profile by id (respects isPublic)
+GET {{baseUrl}}/user/{{otherUserId}}
+Authorization: Bearer {{token}}
+
+### Get a user's projects by username (respects isPublic + owner bypass)
+GET {{baseUrl}}/user/{{username}}/projects
+Authorization: Bearer {{token}}
+
+### Get a user's skills by username (respects isPublic + owner bypass)
+GET {{baseUrl}}/user/{{username}}/skills
+Authorization: Bearer {{token}}
+
+###############################################
+### PROJECTS
+###############################################
+
+### Create a project
+# @name createProject
+POST {{baseUrl}}/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Test Project",
+  "description": "A project created for testing.",
+  "status": "in progress",
+  "isPublic": true
+}
+
+### ^ Copy the returned "id" into @projectId above.
+
+### Get all public projects (no auth needed)
+GET {{baseUrl}}/projects
+
+### Get one project by id (respects isPublic + owner bypass)
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Update a project (must be owner)
+PATCH {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### Delete a project (must be owner)
+DELETE {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Get comments on a project
+GET {{baseUrl}}/projects/{{projectId}}/comments
+Authorization: Bearer {{token}}
+
+###############################################
+### SKILLS
+###############################################
+
+### Create a skill
+# @name createSkill
+POST {{baseUrl}}/skills
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "PostgreSQL",
+  "level": "INTERMEDIATE"
+}
+
+### ^ Copy the returned "id" into @skillId above.
+
+### Get one skill by id (respects owner's isPublic)
+GET {{baseUrl}}/skills/{{skillId}}
+Authorization: Bearer {{token}}
+
+### Update a skill (must be owner)
+PATCH {{baseUrl}}/skills/{{skillId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "level": "ADVANCED"
+}
+
+### Delete a skill (must be owner)
+DELETE {{baseUrl}}/skills/{{skillId}}
+Authorization: Bearer {{token}}
+
+###############################################
+### COMMENTS
+###############################################
+
+### Add a comment to a project
+# @name createComment
+POST {{baseUrl}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "content": "Really cool project!",
+  "projectId": "{{projectId}}"
+}
+
+### ^ Copy the returned "id" into @commentId above.
+
+### Get one comment by id (respects the project's visibility rules)
+GET {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+### Update a comment (must be owner)
+PATCH {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "content": "Updated comment text."
+}
+
+### Delete a comment (must be owner)
+DELETE {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+###############################################
+### STARS
+###############################################
+
+### Star a project
+POST {{baseUrl}}/projects/{{projectId}}/star
+Authorization: Bearer {{token}}
+
+### Unstar a project
+DELETE {{baseUrl}}/projects/{{projectId}}/star
+Authorization: Bearer {{token}}
+
+###############################################
+### SECURITY / EDGE CASE CHECKS
+### Worth running these deliberately — they're the ones we found bugs in tonight.
+###############################################
+
+### Try to view a PRIVATE project you don't own -> should be 401/403, not the data
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Try to view a comment on someone else's PRIVATE project -> should be blocked
+GET {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+### Try to update/delete something you don't own -> should be 401/403
+PATCH {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Hijack attempt"
+}
+
+### Try to star your own project -> should be 400
+POST {{baseUrl}}/projects/{{projectId}}/star
+Authorization: Bearer {{token}}
+
+### Try to star the same project twice -> should be 409 Conflict
+POST {{baseUrl}}/projects/{{projectId}}/star
+Authorization: Bearer {{token}}
+
+### Hit a route with no token at all -> should be 401 unauthenticated
+GET {{baseUrl}}/user/me
+
+### Hit a route with a malformed UUID param -> should be a clean 400, not a raw crash
+GET {{baseUrl}}/projects/not-a-real-uuid
+Authorization: Bearer {{token}}
