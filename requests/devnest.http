@@ -1,24 +1,30 @@
 ### DevNest API — Request Collection
 ### Use with VS Code "REST Client" extension (humao.rest-client) or JetBrains' built-in HTTP client.
 ### Click "Send Request" above any request block below. No Postman needed.
+###
+### AUTH NOTE: This project now uses cookie-based sessions (Redis), not JWT Bearer tokens.
+### After you run Register or Login below, the REST Client extension automatically stores the
+### Set-Cookie response and resends it on every later request in THIS FILE — no manual copying,
+### no @token variable, no Authorization header needed anywhere. Just run Register/Login once,
+### then run any other request below in the same file and the cookie goes along for free.
+### (If a request stops being authenticated, it usually means the session expired or you
+### restarted the Redis container — just re-run Login again.)
 
 @baseUrl = http://localhost:3000/api/v1
 
-### Variables you'll fill in as you test — update these after each relevant request.
-### Tip: after a login/register response comes back, copy the token/id into these lines.
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3NzEzMWQ4ZC1hYzk0LTRjNDMtODc2Yy04Mjc0NzQ2NjM4MGUiLCJpYXQiOjE3ODYxNzUyNDksImV4cCI6MTc4ODc2NzI0OX0.7dIOljpbTQrWFm-t8gENMKz3gdN5dewpLFNhtIs_dUo
+### Variables you'll still fill in manually — these are just ids, not auth.
 @userId = 77131d8d-ac94-4c43-876c-82747466380e
 @otherUserId = 0ba5faae-9ba5-46f0-921e-f9a536890c51
-@projectId = c79154f9-58af-4b44-8b2b-9cf36a32c274
+@projectId = c37512a8-c08d-495c-93c2-0c66fab84027
 @skillId = 08de9af2-06c6-44c0-94c0-75ab40a3b630
 @commentId = PASTE_COMMENT_ID_HERE
-@username = omar_test
+@username = omar_test2
 
 ###############################################
 ### AUTH
 ###############################################
 
-### Register
+### Register — also logs you in (sets the session cookie)
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
@@ -28,29 +34,28 @@ Content-Type: application/json
   "password": "SuperSecret123!"
 }
 
-### Login
+### Login — sets the session cookie. Run this whenever the session expires.
 # @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "omar_test@example.com",
+  "email": "omar_test2@example.com",
   "password": "SuperSecret123!"
 }
 
-### ^ After running login, copy the "token" value from the response into @token above.
+### ^ Check the response headers here for "Set-Cookie: sessionId=...". If it's missing,
+### something's wrong (check the `secure` flag isn't forcing HTTPS-only in local dev).
 
 ###############################################
 ### USER
 ###############################################
 
-### Get current user (me)
+### Get current user (me) — no Authorization header needed, cookie handles it
 GET {{baseUrl}}/user/me
-Authorization: Bearer {{token}}
 
 ### Update current user (me)
 PATCH {{baseUrl}}/user/me
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -59,15 +64,12 @@ Content-Type: application/json
 
 ### Get another user's profile by id (respects isPublic)
 GET {{baseUrl}}/user/{{otherUserId}}
-Authorization: Bearer {{token}}
 
-### Get a user's projects by username (respects isPublic + owner bypass)
+### Get a user's projects by username (respects isPublic + owner bypass + Redis cache)
 GET {{baseUrl}}/user/{{username}}/projects
-Authorization: Bearer {{token}}
 
 ### Get a user's skills by username (respects isPublic + owner bypass)
 GET {{baseUrl}}/user/{{username}}/skills
-Authorization: Bearer {{token}}
 
 ###############################################
 ### PROJECTS
@@ -76,7 +78,6 @@ Authorization: Bearer {{token}}
 ### Create a project
 # @name createProject
 POST {{baseUrl}}/projects
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -88,29 +89,22 @@ Content-Type: application/json
 
 ### ^ Copy the returned "id" into @projectId above.
 
-### Get all public projects (no auth needed)
-GET {{baseUrl}}/projects
-
 ### Get one project by id (respects isPublic + owner bypass)
 GET {{baseUrl}}/projects/{{projectId}}
-Authorization: Bearer {{token}}
 
-### Update a project (must be owner)
+### Update a project (must be owner) — should also invalidate the projects cache
 PATCH {{baseUrl}}/projects/{{projectId}}
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "status": "completed"
 }
 
-### Delete a project (must be owner)
+### Delete a project (must be owner) — should also invalidate the projects cache
 DELETE {{baseUrl}}/projects/{{projectId}}
-Authorization: Bearer {{token}}
 
 ### Get comments on a project
 GET {{baseUrl}}/projects/{{projectId}}/comments
-Authorization: Bearer {{token}}
 
 ###############################################
 ### SKILLS
@@ -119,7 +113,6 @@ Authorization: Bearer {{token}}
 ### Create a skill
 # @name createSkill
 POST {{baseUrl}}/skills
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -131,11 +124,9 @@ Content-Type: application/json
 
 ### Get one skill by id (respects owner's isPublic)
 GET {{baseUrl}}/skills/{{skillId}}
-Authorization: Bearer {{token}}
 
 ### Update a skill (must be owner)
 PATCH {{baseUrl}}/skills/{{skillId}}
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -144,7 +135,6 @@ Content-Type: application/json
 
 ### Delete a skill (must be owner)
 DELETE {{baseUrl}}/skills/{{skillId}}
-Authorization: Bearer {{token}}
 
 ###############################################
 ### COMMENTS
@@ -153,7 +143,6 @@ Authorization: Bearer {{token}}
 ### Add a comment to a project
 # @name createComment
 POST {{baseUrl}}/comments
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -165,11 +154,9 @@ Content-Type: application/json
 
 ### Get one comment by id (respects the project's visibility rules)
 GET {{baseUrl}}/comments/{{commentId}}
-Authorization: Bearer {{token}}
 
 ### Update a comment (must be owner)
 PATCH {{baseUrl}}/comments/{{commentId}}
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -178,7 +165,6 @@ Content-Type: application/json
 
 ### Delete a comment (must be owner)
 DELETE {{baseUrl}}/comments/{{commentId}}
-Authorization: Bearer {{token}}
 
 ###############################################
 ### STARS
@@ -186,11 +172,26 @@ Authorization: Bearer {{token}}
 
 ### Star a project
 POST {{baseUrl}}/projects/{{projectId}}/star
-Authorization: Bearer {{token}}
 
 ### Unstar a project
 DELETE {{baseUrl}}/projects/{{projectId}}/star
-Authorization: Bearer {{token}}
+
+###############################################
+### SESSION-SPECIFIC CHECKS (new — worth running these specifically)
+###############################################
+
+### Confirm the cookie round-trip actually works at all:
+### 1. Run Login above.
+### 2. Look at the response headers for "Set-Cookie: sessionId=...; HttpOnly; ...".
+### 3. Run the request below with NOTHING else changed — no header added by you.
+###    If this succeeds, the browser/REST Client -> cookie -> authMiddleware -> Redis
+###    round trip is genuinely working end to end.
+GET {{baseUrl}}/user/me
+
+### Confirm invalidation still works after switching to cookies:
+### create a project, then re-fetch the owner's project list twice — second call should
+### be a cache hit (check server logs for "Cache hit" / no Prisma query logged).
+GET {{baseUrl}}/user/{{username}}/projects
 
 ###############################################
 ### SECURITY / EDGE CASE CHECKS
@@ -199,15 +200,12 @@ Authorization: Bearer {{token}}
 
 ### Try to view a PRIVATE project you don't own -> should be 401/403, not the data
 GET {{baseUrl}}/projects/{{projectId}}
-Authorization: Bearer {{token}}
 
 ### Try to view a comment on someone else's PRIVATE project -> should be blocked
 GET {{baseUrl}}/comments/{{commentId}}
-Authorization: Bearer {{token}}
 
 ### Try to update/delete something you don't own -> should be 401/403
 PATCH {{baseUrl}}/projects/{{projectId}}
-Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -216,15 +214,17 @@ Content-Type: application/json
 
 ### Try to star your own project -> should be 400
 POST {{baseUrl}}/projects/{{projectId}}/star
-Authorization: Bearer {{token}}
 
 ### Try to star the same project twice -> should be 409 Conflict
 POST {{baseUrl}}/projects/{{projectId}}/star
-Authorization: Bearer {{token}}
 
-### Hit a route with no token at all -> should be 401 unauthenticated
+### Hit a route with NO cookie at all -> should be 401 unauthenticated.
+### The REST Client extension only omits the cookie if you never ran Login in this file,
+### or if you're using a fresh/incognito-style request — otherwise it's hard to simulate
+### "no cookie" from within the same file. Easiest way to really test this one: open the
+### app in an actual browser's private/incognito window and hit an authenticated route
+### with no prior login there.
 GET {{baseUrl}}/user/me
 
 ### Hit a route with a malformed UUID param -> should be a clean 400, not a raw crash
 GET {{baseUrl}}/projects/not-a-real-uuid
-Authorization: Bearer {{token}}
