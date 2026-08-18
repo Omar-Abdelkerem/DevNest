@@ -1,11 +1,12 @@
 import express from "express";
 import helmt from "helmet";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import notFoundMiddleware from "./middleware/not-found.middleware.js";
 import "dotenv/config";
 import errorHandlerMiddleware from "./middleware/error-handler.middleware.js";
+import redisClient from "./config/redis.client.js";
+import { globalLimiter } from "./config/rateLimiter.js";
 const app = express();
 app.use(cookieParser());
 //routes import
@@ -18,12 +19,7 @@ import commentsRoutes from "./routes/comments.routes.js";
 app.use(helmt());
 app.use(cors());
 app.use(express.json());
-app.use(
-  rateLimit({
-    windowMs: 10 * 60 * 1000, // 10 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-  }),
-);
+app.use(globalLimiter);
 
 //routes
 app.get("/", (req, res) => {
