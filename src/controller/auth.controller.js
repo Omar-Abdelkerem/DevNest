@@ -1,12 +1,13 @@
 import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
-import { createJWT } from "../utils/jwt.util.js";
 import {
   hashPassword,
   comparePassword,
 } from "../utils/password-hashing.util.js";
 import { authSchema } from "../schemas/auth.schema.js";
 import { unauthenticatedError } from "../errors/index.js";
+import { createSession } from "../utils/session.util.js";
+import { SESSION_TTL_SECONDS } from "../utils/session.util.js";
 
 export const register = async (req, res) => {
   const validatedData = authSchema.parse(req.body);
@@ -27,8 +28,14 @@ export const register = async (req, res) => {
       createdAt: true,
     },
   });
-  const token = createJWT({ userId: user.id });
-  res.status(statusCodes.CREATED).json({ user, token });
+  const sessionId = await createSession(user.id);
+  res.cookie("sessionId", sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: parseInt(process.env.SESSION_LIFETIME) * 1000, // Convert seconds to milliseconds
+  });
+  res.status(statusCodes.CREATED).json({ user });
 };
 
 export const login = async (req, res) => {
@@ -36,6 +43,16 @@ export const login = async (req, res) => {
   const user = await prisma.user.findUnique({
     where: {
       email,
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      bio: true,
+      avatarUrl: true,
+      isPublic: true,
+      createdAt: true,
+      passwordHash: true,
     },
   });
 
@@ -46,6 +63,13 @@ export const login = async (req, res) => {
   if (!isMatch) {
     throw new unauthenticatedError("Invalid credentials");
   }
-  const token = createJWT({ userId: user.id });
-  res.status(statusCodes.OK).json({ user: { username: user.username }, token });
+  const sessionId = await createSession(user.id);
+  res.cookie("sessionId", sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: SESSION_TTL_SECONDS * 1000, // Convert seconds to milliseconds
+  });
+  const { passwordHash, ...safeUser } = user; // strip it out before sending
+  res.status(statusCodes.OK).json({ user });
 };
