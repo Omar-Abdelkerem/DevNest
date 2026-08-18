@@ -17,6 +17,11 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: devnest-redis
+    restart: unless-stopped
+
   api:
     image: node:22-alpine
     container_name: devnest-api

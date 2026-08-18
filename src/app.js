@@ -2,10 +2,12 @@ import express from "express";
 import helmt from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import notFoundMiddleware from "./middleware/not-found.middleware.js";
 import "dotenv/config";
 import errorHandlerMiddleware from "./middleware/error-handler.middleware.js";
 const app = express();
+app.use(cookieParser());
 //routes import
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
