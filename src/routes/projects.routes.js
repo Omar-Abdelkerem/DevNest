@@ -2,7 +2,6 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import {
   addProject,
-  getAllProjects,
   getProjectById,
   updateProjectById,
   deleteProjectById,
@@ -32,7 +31,6 @@ router.post("/", authMiddleware, addProject);
 router.patch("/:id", authMiddleware, checkProjectOwnership, updateProjectById);
 router.delete("/:id", authMiddleware, checkProjectOwnership, deleteProjectById);
 router.get("/:id", authMiddleware, getProjectById);
-router.get("/", getAllProjects);
 router.get("/:id/comments", authMiddleware, getAllCommentsByProjectId);
 router.post("/:id/star", authMiddleware, addStar);
 router.delete("/:id/star", authMiddleware, removeStar);
