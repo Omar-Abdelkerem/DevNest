@@ -12,7 +12,7 @@ client.on("error", (err) => {
   console.error("Redis Client Error", err);
 });
 
-// Change this from blocking await to a non-blocking catch call:
+// THIS IS THE FIX: Non-blocking connection
 client.connect().catch((err) => {
   console.error("Failed to connect to Redis on startup:", err);
 });
