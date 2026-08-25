@@ -1,22 +1,27 @@
 import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
-import { notFoundError, badRequestError } from "../errors/index.js";
+import { notFoundError } from "../errors/index.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
 
 export const addStar = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
-  const userId = req.user.userId;
+  const userId = req.user.userId || req.user.id;
 
   const project = await prisma.project.findUnique({
-    where: { id: id, isPublic: true, user: { isPublic: true } },
+    where: { id },
+    include: { user: true },
   });
 
   if (!project) {
     throw new notFoundError(`Project with id ${id} not found`);
   }
 
-  if (project.userId === userId) {
-    throw new badRequestError("You cannot star your own project.");
+  // Ensure user has permission to see it (owner or public)
+  const isOwner = project.userId === userId;
+  const isVisible = project.isPublic && project.user?.isPublic;
+
+  if (!isOwner && !isVisible) {
+    throw new notFoundError(`Project with id ${id} not found`);
   }
 
   const existingStar = await prisma.star.findUnique({
@@ -35,10 +40,11 @@ export const addStar = async (req, res) => {
 
 export const removeStar = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
-  const userId = req.user.userId;
+  const userId = req.user.userId || req.user.id;
 
   const project = await prisma.project.findUnique({
-    where: { id, isPublic: true, user: { isPublic: true } },
+    where: { id },
+    include: { user: true },
   });
 
   if (!project) {

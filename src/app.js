@@ -15,9 +15,15 @@ import userRoutes from "./routes/user.routes.js";
 import projectsRoutes from "./routes/projects.routes.js";
 import skillsRoutes from "./routes/skills.routes.js";
 import commentsRoutes from "./routes/comments.routes.js";
+import feedbackRoutes from "./routes/feedback.routes.js";
 //middleware
 app.use(helmt());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173", // your real frontend's origin, exactly
+    credentials: true, // allows cookies to be sent/received
+  }),
+);
 app.use(express.json());
 app.use(globalLimiter);
 
@@ -30,7 +36,7 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/projects", projectsRoutes);
 app.use("/api/v1/skills", skillsRoutes);
 app.use("/api/v1/comments", commentsRoutes);
-
+app.use("/api/v1/feedback", feedbackRoutes);
 //error handling
 app.use(notFoundMiddleware);
 app.use(errorHandlerMiddleware);

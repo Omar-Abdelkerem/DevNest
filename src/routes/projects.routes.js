@@ -1,10 +1,13 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
 import {
   addProject,
   getProjectById,
   updateProjectById,
   deleteProjectById,
+  getAllProjects,
+  getStarredProjects,
 } from "../controller/project.controller.js";
 import prisma from "../config/prisma.client.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
@@ -28,10 +31,12 @@ const checkProjectOwnership = checkOwnership(
 const router = express.Router();
 
 router.post("/", authMiddleware, addProject);
+router.get("/", optionalAuthMiddleware, getAllProjects);
 router.patch("/:id", authMiddleware, checkProjectOwnership, updateProjectById);
 router.delete("/:id", authMiddleware, checkProjectOwnership, deleteProjectById);
-router.get("/:id", authMiddleware, getProjectById);
-router.get("/:id/comments", authMiddleware, getAllCommentsByProjectId);
+router.get("/starred/me", authMiddleware, getStarredProjects);
+router.get("/:id", optionalAuthMiddleware, getProjectById);
+router.get("/:id/comments", optionalAuthMiddleware, getAllCommentsByProjectId);
 router.post("/:id/star", authMiddleware, addStar);
 router.delete("/:id/star", authMiddleware, removeStar);
 

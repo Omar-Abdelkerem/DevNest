@@ -11,8 +11,9 @@ export const updateUserSchema = z.object({
   email: z.string().email("Invalid email address").optional(),
   bio: z
     .string()
-    .max(160, "Bio must be at most 160 characters long")
-    .optional(),
+    .max(160, { message: "Bio cannot exceed 160 characters." })
+    .optional()
+    .nullable(),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters long")
@@ -20,4 +21,14 @@ export const updateUserSchema = z.object({
     .optional(),
   avatarUrl: z.string().url("Invalid URL").optional(),
   links: z.array(z.string().url("Invalid URL")).optional(),
+  isPublic: z.boolean().optional(),
+  about: z.string().max(1500, "About section is too long").optional(),
+  skills: z
+    .array(
+      z.object({
+        name: z.string(),
+        level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"]),
+      }),
+    )
+    .optional(),
 });

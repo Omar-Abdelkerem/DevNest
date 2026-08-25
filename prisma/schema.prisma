@@ -17,6 +17,7 @@ model User {
   email        String    @unique
   passwordHash String
   bio          String?
+  about   String?
   avatarUrl    String?
   links        Json?
   createdAt    DateTime  @default(now())
@@ -24,10 +25,12 @@ model User {
   isPublic     Boolean   @default(true)
   projects     Project[]
   skills       Skill[]
-  followers    Follow[]  @relation("following")
-  following    Follow[]  @relation("follower")
-  comments     Comment[]
-  stars        Star[]
+  followers         Follow[]           @relation("following")
+  following         Follow[]           @relation("follower")
+  comments          Comment[]
+  stars             Star[]
+  feedbackGiven     ProfileFeedback[]  @relation("feedbackAuthor")
+  feedbackReceived  ProfileFeedback[]  @relation("feedbackRecipient")
 }
 
 model Project {
@@ -40,11 +43,12 @@ model Project {
   isPublic      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  userId        String
-  user          User           @relation(fields: [userId], references: [id])
-  comments      Comment[]
-  stars         Star[]
-  projectSkills ProjectSkill[]
+  userId           String
+  projectLanguages ProjectLanguage[]
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments         Comment[]
+  stars            Star[]
+  projectSkills    ProjectSkill[]
 }
 
 enum SkillLevel {
@@ -68,8 +72,8 @@ model Follow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
-  follower    User     @relation("follower", fields: [followerId], references: [id])
-  following   User     @relation("following", fields: [followingId], references: [id])
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
 }
@@ -81,16 +85,26 @@ model Comment {
   updatedAt DateTime @updatedAt
   userId    String
   projectId String
-  user      User     @relation(fields: [userId], references: [id])
-  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProfileFeedback {
+  id          String   @id @default(uuid())
+  content     String
+  createdAt   DateTime @default(now())
+  authorId    String
+  recipientId String
+  author      User     @relation("feedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("feedbackRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 }
 
 model Star {
   userId    String
   projectId String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([userId, projectId])
 }
@@ -98,8 +112,25 @@ model Star {
 model ProjectSkill {
   projectId String
   skillId   String
-  project   Project @relation(fields: [projectId], references: [id])
-  skill     Skill   @relation(fields: [skillId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@id([projectId, skillId])
+}
+model Language {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  projectLanguages ProjectLanguage[]
+}
+
+// Maps to the existing "ProjectLanguages" table so `npx prisma generate`
+// exposes prisma.projectLanguage.create (the name the controller expects).
+model ProjectLanguage {
+  projectId  String
+  languageId String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, languageId])
+  @@map("ProjectLanguages")
 }

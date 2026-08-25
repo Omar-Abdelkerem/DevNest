@@ -5,6 +5,7 @@ export const projectIdSchema = z.object({
 export const addProjectSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
   description: z.string().optional(),
+  status: z.enum(["not started", "in progress", "completed"]).optional(),
   projectimgUrl: z.string().optional(),
   links: z
     .array(
@@ -16,6 +17,7 @@ export const addProjectSchema = z.object({
     .optional(),
   readme: z.string().optional(),
   isPublic: z.boolean().optional(),
+  languages: z.array(z.string().min(1)).optional(), // e.g. ["Rust", "Go"]
 });
 export const updateProjectSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }).optional(),
@@ -31,4 +33,5 @@ export const updateProjectSchema = z.object({
     .optional(),
   readme: z.string().optional(),
   isPublic: z.boolean().optional(),
+  languages: z.array(z.string().min(1)).optional(),
 });

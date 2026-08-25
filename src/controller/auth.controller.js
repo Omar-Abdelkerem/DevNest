@@ -7,7 +7,7 @@ import {
 import { authSchema } from "../schemas/auth.schema.js";
 import { unauthenticatedError } from "../errors/index.js";
 import { createSession } from "../utils/session.util.js";
-import { SESSION_TTL_SECONDS } from "../utils/session.util.js";
+import { SESSION_TTL_SECONDS, deleteSession } from "../utils/session.util.js";
 
 export const register = async (req, res) => {
   const validatedData = authSchema.parse(req.body);
@@ -32,8 +32,8 @@ export const register = async (req, res) => {
   res.cookie("sessionId", sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: parseInt(process.env.SESSION_LIFETIME) * 1000, // Convert seconds to milliseconds
+    sameSite: "lax",
+    maxAge: SESSION_TTL_SECONDS * 1000, // Convert seconds to milliseconds
   });
   res.status(statusCodes.CREATED).json({ user });
 };
@@ -67,9 +67,22 @@ export const login = async (req, res) => {
   res.cookie("sessionId", sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: SESSION_TTL_SECONDS * 1000, // Convert seconds to milliseconds
   });
   const { passwordHash, ...safeUser } = user; // strip it out before sending
-  res.status(statusCodes.OK).json({ user });
+  res.status(statusCodes.OK).json({ user: safeUser });
+};
+
+export const logout = async (req, res) => {
+  const sessionId = req.cookies.sessionId;
+  if (sessionId) {
+    await deleteSession(sessionId);
+  }
+  res.clearCookie("sessionId", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.status(statusCodes.OK).json({ message: "Logged out successfully" });
 };

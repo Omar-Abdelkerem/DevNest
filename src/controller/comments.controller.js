@@ -91,13 +91,22 @@ export const getAllCommentsByProjectId = async (req, res) => {
     throw new notFoundError(`Project with id ${id} not found`);
   }
 
-  const isOwner = project.userId === req.user.userId;
+  // Use req.user?.userId or req.user?.id depending on your auth middleware shape
+  const requesterId = req.user?.userId || req.user?.id;
+  const isOwner = project.userId === requesterId;
   const isVisible = project.isPublic && project.user.isPublic;
 
   if (!isVisible && !isOwner) {
     throw new unauthorizedError("This project is private.");
   }
 
-  const comments = await prisma.comment.findMany({ where: { projectId: id } });
+  const comments = await prisma.comment.findMany({
+    where: { projectId: id },
+    include: {
+      user: { select: { id: true, username: true, avatarUrl: true } }, // Fetch the commenter's info!
+    },
+    orderBy: { createdAt: "asc" }, // Show oldest comments first
+  });
+
   res.status(statusCodes.OK).json(comments);
 };

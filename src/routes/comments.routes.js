@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
 import {
   addComment,
   updateCommentById,
@@ -29,6 +30,6 @@ const router = express.Router();
 router.post("/", authMiddleware, addComment);
 router.patch("/:id", authMiddleware, checkCommentOwnership, updateCommentById);
 router.delete("/:id", authMiddleware, checkCommentOwnership, deleteCommentById);
-router.get("/:id", authMiddleware, getCommentById);
+router.get("/:id", optionalAuthMiddleware, getCommentById);
 
 export default router;
