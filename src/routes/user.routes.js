@@ -18,7 +18,11 @@ router.patch("/me", authMiddleware, updateCurrentUser);
 router.patch("/me/avatar", authMiddleware, uploadAvatar, updateAvatar);
 router.get("/:username", optionalAuthMiddleware, getUserByUsername);
 router.get("/:id", authMiddleware, getUserById);
-router.get("/:username/projects", authMiddleware, getAllProjectsByUsername);
-router.get("/:username/skills", authMiddleware, getAllSkillsbyUsername);
+router.get(
+  "/:username/projects",
+  optionalAuthMiddleware,
+  getAllProjectsByUsername,
+);
+router.get("/:username/skills", optionalAuthMiddleware, getAllSkillsbyUsername);
 
 export default router;
