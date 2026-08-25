@@ -12,6 +12,9 @@ client.on("error", (err) => {
   console.error("Redis Client Error", err);
 });
 
-await client.connect();
+// Connect in the background so it doesn't block the server from starting!
+client.connect().catch((err) => {
+  console.error("Failed to connect to Redis on startup:", err);
+});
 
 export default client;
