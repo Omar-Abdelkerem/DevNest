@@ -20,7 +20,7 @@ import feedbackRoutes from "./routes/feedback.routes.js";
 app.use(helmt());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://devnest-web-xi.vercel.app/"], // your real frontend's origin, exactly
+    origin: ["http://localhost:5173", "https://devnest-web-xi.vercel.app"],
     credentials: true, // allows cookies to be sent/received
   }),
 );
