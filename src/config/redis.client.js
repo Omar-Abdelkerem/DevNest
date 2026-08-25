@@ -2,11 +2,10 @@ import { createClient } from "redis";
 
 const client = createClient({
   url: process.env.REDIS_URL,
+  pingInterval: 120000, // Pings Upstash every 2 minutes to stop it from hanging up
   socket: {
-    // This tells Node.js not to drop the connection over certificate mismatch
+    tls: true, // Explicitly forces TLS for Upstash
     rejectUnauthorized: false,
-    // This sends a tiny ping in the background to keep the Upstash connection alive
-    keepAlive: 300,
   },
 });
 
