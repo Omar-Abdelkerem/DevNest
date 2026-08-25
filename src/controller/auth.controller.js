@@ -32,7 +32,7 @@ export const register = async (req, res) => {
   res.cookie("sessionId", sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "none",
     maxAge: SESSION_TTL_SECONDS * 1000, // Convert seconds to milliseconds
   });
   res.status(statusCodes.CREATED).json({ user });
@@ -67,8 +67,8 @@ export const login = async (req, res) => {
   res.cookie("sessionId", sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_TTL_SECONDS * 1000, // Convert seconds to milliseconds
+    maxAge: SESSION_TTL_SECONDS * 1000,
+    sameSite: "none", // Convert seconds to milliseconds
   });
   const { passwordHash, ...safeUser } = user; // strip it out before sending
   res.status(statusCodes.OK).json({ user: safeUser });
@@ -82,7 +82,7 @@ export const logout = async (req, res) => {
   res.clearCookie("sessionId", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "none",
   });
   res.status(statusCodes.OK).json({ message: "Logged out successfully" });
 };

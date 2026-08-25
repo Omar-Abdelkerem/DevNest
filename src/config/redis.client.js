@@ -2,11 +2,6 @@ import { createClient } from "redis";
 
 const client = createClient({
   url: process.env.REDIS_URL,
-  pingInterval: 120000, // Pings Upstash every 2 minutes to stop it from hanging up
-  socket: {
-    tls: true, // Explicitly forces TLS for Upstash
-    rejectUnauthorized: false,
-  },
 });
 
 client.on("connect", () => {
