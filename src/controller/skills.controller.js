@@ -58,7 +58,7 @@ export const getAllSkillsbyUsername = async (req, res) => {
   if (!user) {
     throw new notFoundError(`User with username ${username} not found`);
   }
-  if (!user.isPublic && user.id !== req.user.userId) {
+  if (!user.isPublic && user.id !== req.user?.userId) {
     throw new unauthorizedError("This profile is private.");
   }
 
