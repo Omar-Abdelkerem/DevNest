@@ -1,12 +1,16 @@
 import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
 import { notFoundError, unauthorizedError } from "../errors/index.js";
+import getOrSetCache from "../utils/cache.util.js";
 import {
   addCommentSchema,
   updateCommentSchema,
   commentIdSchema,
 } from "../schemas/comments.schema.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
+
+/** Must mirror project.controller.js so we read from the same cache key. */
+const projectCacheKey = (id) => `project:id:${id}:v1`;
 
 export const addComment = async (req, res) => {
   const validatedData = addCommentSchema.parse(req.body);
@@ -82,19 +86,33 @@ export const getCommentById = async (req, res) => {
 export const getAllCommentsByProjectId = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: { user: { select: { isPublic: true } } },
-  });
+  // Try to read the project from the shared cache first (populated by getProjectById).
+  // Falls back to a DB query if the cache is cold — avoids a second RTT on the hot path.
+  const project = await getOrSetCache(
+    projectCacheKey(id),
+    3600,
+    async () => {
+      const row = await prisma.project.findUnique({
+        where: { id },
+        include: {
+          user: { select: { id: true, username: true, avatarUrl: true, isPublic: true } },
+          projectLanguages: { include: { language: true } },
+          _count: { select: { stars: true } },
+        },
+      });
+      return row;
+    },
+  );
 
   if (!project) {
     throw new notFoundError(`Project with id ${id} not found`);
   }
 
-  // Use req.user?.userId or req.user?.id depending on your auth middleware shape
   const requesterId = req.user?.userId || req.user?.id;
   const isOwner = project.userId === requesterId;
-  const isVisible = project.isPublic && project.user.isPublic;
+  // Cached project stores isPublic on `owner` (serialized) or directly on `user`.
+  const ownerIsPublic = project.owner?.isPublic ?? project.user?.isPublic ?? false;
+  const isVisible = project.isPublic && ownerIsPublic;
 
   if (!isVisible && !isOwner) {
     throw new unauthorizedError("This project is private.");
@@ -103,9 +121,9 @@ export const getAllCommentsByProjectId = async (req, res) => {
   const comments = await prisma.comment.findMany({
     where: { projectId: id },
     include: {
-      user: { select: { id: true, username: true, avatarUrl: true } }, // Fetch the commenter's info!
+      user: { select: { id: true, username: true, avatarUrl: true } },
     },
-    orderBy: { createdAt: "asc" }, // Show oldest comments first
+    orderBy: { createdAt: "asc" },
   });
 
   res.status(statusCodes.OK).json(comments);

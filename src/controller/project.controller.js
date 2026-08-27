@@ -1,7 +1,7 @@
 import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
 import invalidateOwnerPublicCache from "../utils/invalidateOwnerPublicCache.js";
-import getOrSetCache from "../utils/cache.util.js";
+import getOrSetCache, { deleteCache } from "../utils/cache.util.js";
 import { notFoundError, unauthorizedError } from "../errors/index.js";
 import {
   addProjectSchema,
@@ -23,6 +23,9 @@ const projectInclude = {
 };
 
 const requesterId = (req) => req.user?.userId || req.user?.id || null;
+
+/** Canonical Redis key for a single cached project (user-agnostic). */
+const projectCacheKey = (id) => `project:id:${id}:v1`;
 
 const overlayHasStarred = async (projects, userId) => {
   if (!Array.isArray(projects)) return projects;
@@ -101,11 +104,9 @@ export const addProject = async (req, res) => {
     });
   });
 
-  const owner = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { username: true },
-  });
-  await invalidateOwnerPublicCache("projects", owner.username);
+  // Use the username already present in the JWT — avoids an extra DB round-trip.
+  const username = req.user?.username;
+  await invalidateOwnerPublicCache("projects", username);
   res.status(statusCodes.CREATED).json(serializeProject(project));
 };
 
@@ -127,11 +128,12 @@ export const updateProjectById = async (req, res) => {
     });
   });
 
-  const owner = await prisma.user.findUnique({
-    where: { id: req.resource.userId },
-    select: { username: true },
-  });
-  await invalidateOwnerPublicCache("projects", owner.username);
+  const username = req.user?.username;
+  // Invalidate both the list cache and the single-project cache in one RTT.
+  await Promise.all([
+    invalidateOwnerPublicCache("projects", username),
+    deleteCache(projectCacheKey(req.resource.id)),
+  ]);
   res.status(statusCodes.OK).json(serializeProject(project));
 };
 
@@ -139,43 +141,61 @@ export const deleteProjectById = async (req, res) => {
   await prisma.project.delete({
     where: { id: req.resource.id },
   });
-  const owner = await prisma.user.findUnique({
-    where: { id: req.resource.userId },
-    select: { username: true },
-  });
-  await invalidateOwnerPublicCache("projects", owner.username);
+  const username = req.user?.username;
+  // Invalidate both the list cache and the single-project cache in one RTT.
+  await Promise.all([
+    invalidateOwnerPublicCache("projects", username),
+    deleteCache(projectCacheKey(req.resource.id)),
+  ]);
   res.status(statusCodes.NO_CONTENT).send();
 };
 
 export const getProjectById = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
-  const userId = requesterId(req); // Gets the current user
+  const userId = requesterId(req);
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      ...projectInclude,
-      _count: { select: { stars: true } }, // Gets the total count
-      stars: userId ? { where: { userId } } : false, // Checks if THIS user starred it
+  // Cache the user-agnostic project data (no hasStarred stored in cache).
+  // The per-user starred overlay is computed *after* cache retrieval, matching
+  // the same pattern used by getAllProjectsByUsername + overlayHasStarred.
+  const cached = await getOrSetCache(
+    projectCacheKey(id),
+    3600,
+    async () => {
+      const row = await prisma.project.findUnique({
+        where: { id },
+        include: {
+          ...projectInclude,
+          _count: { select: { stars: true } },
+        },
+      });
+      if (!row) return null;
+      return serializeProject(row);
     },
-  });
+  );
 
-  if (!project) {
+  if (!cached) {
     throw new notFoundError(`Project with id ${id} not found`);
   }
 
-  const isOwner = requesterId(req) === project.userId;
+  const isOwner = userId === cached.userId;
   // Owners always see their own project, public or private.
-  if (isOwner) {
-    return res.status(statusCodes.OK).json(serializeProject(project));
+  if (!isOwner) {
+    const isVisible = cached.isPublic && cached.owner?.isPublic;
+    if (!isVisible) {
+      throw new unauthorizedError("This project is private.");
+    }
   }
 
-  const isVisible = project.isPublic && project.user?.isPublic;
-  if (!isVisible) {
-    throw new unauthorizedError("This project is private.");
+  // Overlay the per-user hasStarred flag without touching the shared cache.
+  if (userId) {
+    const starRow = await prisma.star.findUnique({
+      where: { userId_projectId: { userId, projectId: id } },
+      select: { projectId: true },
+    });
+    return res.status(statusCodes.OK).json({ ...cached, hasStarred: !!starRow });
   }
 
-  res.status(statusCodes.OK).json(serializeProject(project));
+  res.status(statusCodes.OK).json({ ...cached, hasStarred: false });
 };
 
 export const getAllProjectsByUsername = async (req, res) => {

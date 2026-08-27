@@ -12,4 +12,15 @@ const getOrSetCache = async (key, ttlSeconds, fetchFunction) => {
   return freshData;
 };
 
+/**
+ * Delete one or more cache keys in a single Redis round-trip.
+ * node-redis v4+ accepts an array to DEL — one RTT vs N serial calls.
+ */
+export const deleteCache = async (...keys) => {
+  const flat = keys.flat().filter(Boolean);
+  if (flat.length === 0) return;
+  await client.del(flat);
+  console.log(`Cache invalidated: ${flat.join(", ")}`);
+};
+
 export default getOrSetCache;
