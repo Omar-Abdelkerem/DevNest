@@ -36,6 +36,7 @@ export const createPrismaMock = () => ({
   },
   star: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     create: jest.fn(),
     delete: jest.fn(),
   },
@@ -66,6 +67,22 @@ export async function loadAppWithMocks({
     default: prismaMock,
   }));
 
+  await jest.unstable_mockModule("../src/config/rateLimiter.js", () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next(),
+  }));
+
+  await jest.unstable_mockModule("../src/config/redis.client.js", () => ({
+    default: {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue("OK"),
+      del: jest.fn().mockResolvedValue(1),
+      sendCommand: jest.fn().mockResolvedValue(["OK", 1]),
+      on: jest.fn(),
+      connect: jest.fn().mockResolvedValue(undefined),
+    },
+  }));
+
   await jest.unstable_mockModule("../src/middleware/auth.middleware.js", () => ({
     default: (req, res, next) => {
       req.user = {
@@ -74,6 +91,19 @@ export async function loadAppWithMocks({
       next();
     },
   }));
+
+  await jest.unstable_mockModule(
+    "../src/middleware/optionalAuth.middleware.js",
+    () => ({
+      default: (req, res, next) => {
+        const userId = req.headers["x-user-id"];
+        if (userId) {
+          req.user = { userId };
+        }
+        next();
+      },
+    }),
+  );
 
   if (mockPasswordUtils) {
     await jest.unstable_mockModule("../src/utils/password-hashing.util.js", () => ({

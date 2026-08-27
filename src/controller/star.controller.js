@@ -2,6 +2,7 @@ import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
 import { notFoundError } from "../errors/index.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
+import invalidateOwnerPublicCache from "../utils/invalidateOwnerPublicCache.js";
 
 export const addStar = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
@@ -35,6 +36,7 @@ export const addStar = async (req, res) => {
   }
 
   const star = await prisma.star.create({ data: { userId, projectId: id } });
+  await invalidateOwnerPublicCache("projects", project.user?.username);
   res.status(statusCodes.CREATED).json(star);
 };
 
@@ -65,5 +67,6 @@ export const removeStar = async (req, res) => {
     where: { userId_projectId: { userId, projectId: id } },
   });
 
+  await invalidateOwnerPublicCache("projects", project.user?.username);
   res.status(statusCodes.NO_CONTENT).send();
 };

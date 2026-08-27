@@ -24,6 +24,24 @@ const projectInclude = {
 
 const requesterId = (req) => req.user?.userId || req.user?.id || null;
 
+const overlayHasStarred = async (projects, userId) => {
+  if (!Array.isArray(projects)) return projects;
+  if (!userId || projects.length === 0) {
+    return projects.map((project) => ({ ...project, hasStarred: false }));
+  }
+
+  const ids = projects.map((project) => project.id).filter(Boolean);
+  const rows = await prisma.star.findMany({
+    where: { userId, projectId: { in: ids } },
+    select: { projectId: true },
+  });
+  const starredIds = new Set(rows.map((row) => row.projectId));
+  return projects.map((project) => ({
+    ...project,
+    hasStarred: starredIds.has(project.id),
+  }));
+};
+
 const serializeProject = (project) => {
   if (!project) return project;
   const rows = project.projectLanguages || [];
@@ -194,7 +212,9 @@ export const getAllProjectsByUsername = async (req, res) => {
     },
   );
 
-  res.status(statusCodes.OK).json(projects);
+  res
+    .status(statusCodes.OK)
+    .json(await overlayHasStarred(projects, requesterId(req)));
 };
 
 export const getAllProjects = async (req, res) => {
@@ -221,7 +241,9 @@ export const getAllProjects = async (req, res) => {
       include: projectInclude,
       orderBy: { createdAt: "desc" },
     });
-    return res.status(statusCodes.OK).json(rows.map(serializeProject));
+    return res
+      .status(statusCodes.OK)
+      .json(await overlayHasStarred(rows.map(serializeProject), requesterId(req)));
   }
 
   // If no search query, use the standard cached Explore page
@@ -234,7 +256,9 @@ export const getAllProjects = async (req, res) => {
     return rows.map(serializeProject);
   });
 
-  res.status(statusCodes.OK).json(projects);
+  res
+    .status(statusCodes.OK)
+    .json(await overlayHasStarred(projects, requesterId(req)));
 };
 
 export const getStarredProjects = async (req, res) => {

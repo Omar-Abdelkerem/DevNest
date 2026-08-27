@@ -127,5 +127,78 @@ describe("project routes", () => {
       id: PROJECT_ID,
       title: "Public project",
     });
+    expect(response.body[0].hasStarred).toBe(false);
+    expect(typeof response.body[0].stars).toBe("number");
+  });
+
+  test("GET / sets hasStarred true for the requester who starred a project", async () => {
+    prismaMock.project.findMany.mockResolvedValue([
+      {
+        id: PROJECT_ID,
+        title: "Public project",
+        isPublic: true,
+        _count: { stars: 4 },
+      },
+    ]);
+    prismaMock.star.findMany.mockResolvedValue([{ projectId: PROJECT_ID }]);
+
+    const response = await request(app)
+      .get("/api/v1/projects")
+      .set(createAuthHeaders(STRANGER_ID));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body[0].stars).toBe(4);
+    expect(response.body[0]._count.stars).toBe(4);
+    expect(response.body[0].hasStarred).toBe(true);
+    expect(prismaMock.star.findMany).toHaveBeenCalledWith({
+      where: { userId: STRANGER_ID, projectId: { in: [PROJECT_ID] } },
+      select: { projectId: true },
+    });
+  });
+
+  test("GET / keeps hasStarred false for a logged-in user who has not starred", async () => {
+    prismaMock.project.findMany.mockResolvedValue([
+      {
+        id: PROJECT_ID,
+        title: "Public project",
+        isPublic: true,
+        _count: { stars: 2 },
+      },
+    ]);
+    prismaMock.star.findMany.mockResolvedValue([]);
+
+    const response = await request(app)
+      .get("/api/v1/projects")
+      .set(createAuthHeaders(STRANGER_ID));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body[0].stars).toBe(2);
+    expect(response.body[0].hasStarred).toBe(false);
+  });
+
+  test("GET /user/:username/projects overlays hasStarred for the requester", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: OWNER_ID,
+      username: "owner",
+      isPublic: true,
+    });
+    prismaMock.project.findMany.mockResolvedValue([
+      {
+        id: PROJECT_ID,
+        title: "Owner project",
+        isPublic: true,
+        userId: OWNER_ID,
+        _count: { stars: 1 },
+      },
+    ]);
+    prismaMock.star.findMany.mockResolvedValue([{ projectId: PROJECT_ID }]);
+
+    const response = await request(app)
+      .get("/api/v1/user/owner/projects")
+      .set(createAuthHeaders(STRANGER_ID));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body[0].stars).toBe(1);
+    expect(response.body[0].hasStarred).toBe(true);
   });
 });
