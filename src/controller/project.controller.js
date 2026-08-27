@@ -19,6 +19,7 @@ const ownerSelect = {
 const projectInclude = {
   user: { select: ownerSelect },
   projectLanguages: { include: { language: true } },
+  _count: { select: { stars: true } },
 };
 
 const requesterId = (req) => req.user?.userId || req.user?.id || null;
@@ -34,6 +35,7 @@ const serializeProject = (project) => {
     language: languageNames[0] || null,
     user: project.user || null,
     owner: project.user || null,
+    stars: project._count?.stars ?? 0,
     hasStarred: Array.isArray(stars) && stars.length > 0, // Defines the UI state
   };
 };
@@ -177,7 +179,7 @@ export const getAllProjectsByUsername = async (req, res) => {
     type = "owner";
   }
   const projects = await getOrSetCache(
-    `projects:username:${username}:${type}`,
+    `projects:username:${username}:${type}:v2`,
     3600,
     async () => {
       const where = { userId: user.id };
@@ -223,7 +225,7 @@ export const getAllProjects = async (req, res) => {
   }
 
   // If no search query, use the standard cached Explore page
-  const projects = await getOrSetCache(`projects:all`, 3600, async () => {
+  const projects = await getOrSetCache(`projects:all:v2`, 3600, async () => {
     const rows = await prisma.project.findMany({
       where: whereClause,
       include: projectInclude,
