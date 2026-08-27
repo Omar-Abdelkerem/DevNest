@@ -16,7 +16,7 @@ const ownerSelect = {
   isPublic: true,
 };
 
-const projectInclude = {
+export const projectInclude = {
   user: { select: ownerSelect },
   projectLanguages: { include: { language: true } },
   _count: { select: { stars: true } },
@@ -45,7 +45,7 @@ const overlayHasStarred = async (projects, userId) => {
   }));
 };
 
-const serializeProject = (project) => {
+export const serializeProject = (project) => {
   if (!project) return project;
   const rows = project.projectLanguages || [];
   const languageNames = rows.map((row) => row.language?.name).filter(Boolean);

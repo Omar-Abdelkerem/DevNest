@@ -8,6 +8,7 @@ import {
   commentIdSchema,
 } from "../schemas/comments.schema.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
+import { projectInclude, serializeProject } from "./project.controller.js";
 
 /** Must mirror project.controller.js so we read from the same cache key. */
 const projectCacheKey = (id) => `project:id:${id}:v1`;
@@ -94,13 +95,9 @@ export const getAllCommentsByProjectId = async (req, res) => {
     async () => {
       const row = await prisma.project.findUnique({
         where: { id },
-        include: {
-          user: { select: { id: true, username: true, avatarUrl: true, isPublic: true } },
-          projectLanguages: { include: { language: true } },
-          _count: { select: { stars: true } },
-        },
+        include: projectInclude,
       });
-      return row;
+      return serializeProject(row);
     },
   );
 
