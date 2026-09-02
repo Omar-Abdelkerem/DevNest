@@ -49,6 +49,8 @@ model Project {
   comments         Comment[]
   stars            Star[]
   projectSkills    ProjectSkill[]
+
+  @@index([userId])
 }
 
 enum SkillLevel {
@@ -65,6 +67,8 @@ model Skill {
   userId        String
   user          User           @relation(fields: [userId], references: [id])
   projectSkills ProjectSkill[]
+
+  @@index([userId])
 }
 
 model Follow {
@@ -76,6 +80,7 @@ model Follow {
   following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
+  @@index([followingId])
 }
 
 model Comment {
@@ -87,6 +92,9 @@ model Comment {
   projectId String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
 }
 
 model ProfileFeedback {
@@ -97,6 +105,9 @@ model ProfileFeedback {
   recipientId String
   author      User     @relation("feedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   recipient   User     @relation("feedbackRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([recipientId])
 }
 
 model Star {
@@ -107,6 +118,7 @@ model Star {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([userId, projectId])
+  @@index([projectId])
 }
 
 model ProjectSkill {
@@ -116,6 +128,7 @@ model ProjectSkill {
   skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@id([projectId, skillId])
+  @@index([skillId])
 }
 model Language {
   id               String            @id @default(uuid())
@@ -132,5 +145,6 @@ model ProjectLanguage {
   language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
 
   @@id([projectId, languageId])
+  @@index([languageId])
   @@map("ProjectLanguages")
 }
