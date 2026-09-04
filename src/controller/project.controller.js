@@ -27,6 +27,9 @@ const requesterId = (req) => req.user?.userId || req.user?.id || null;
 /** Canonical Redis key for a single cached project (user-agnostic). */
 const projectCacheKey = (id) => `project:id:${id}:v1`;
 
+/** Canonical Redis key for the landing-page featured slice. */
+const FEATURED_CACHE_KEY = "projects:featured:v2";
+
 const overlayHasStarred = async (projects, userId) => {
   if (!Array.isArray(projects)) return projects;
   if (!userId || projects.length === 0) {
@@ -154,31 +157,20 @@ export const getProjectById = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
   const userId = requesterId(req);
 
-  // Cache the user-agnostic project data (no hasStarred stored in cache).
-  // The per-user starred overlay is computed *after* cache retrieval, matching
-  // the same pattern used by getAllProjectsByUsername + overlayHasStarred.
-  const cached = await getOrSetCache(
-    projectCacheKey(id),
-    3600,
-    async () => {
-      const row = await prisma.project.findUnique({
-        where: { id },
-        include: {
-          ...projectInclude,
-          _count: { select: { stars: true } },
-        },
-      });
-      if (!row) return null;
-      return serializeProject(row);
-    },
-  );
+  const cached = await getOrSetCache(projectCacheKey(id), 3600, async () => {
+    const row = await prisma.project.findUnique({
+      where: { id },
+      include: projectInclude,
+    });
+    if (!row) return null;
+    return serializeProject(row);
+  });
 
   if (!cached) {
     throw new notFoundError(`Project with id ${id} not found`);
   }
 
   const isOwner = userId === cached.userId;
-  // Owners always see their own project, public or private.
   if (!isOwner) {
     const isVisible = cached.isPublic && cached.owner?.isPublic;
     if (!isVisible) {
@@ -186,13 +178,14 @@ export const getProjectById = async (req, res) => {
     }
   }
 
-  // Overlay the per-user hasStarred flag without touching the shared cache.
   if (userId) {
     const starRow = await prisma.star.findUnique({
       where: { userId_projectId: { userId, projectId: id } },
       select: { projectId: true },
     });
-    return res.status(statusCodes.OK).json({ ...cached, hasStarred: !!starRow });
+    return res
+      .status(statusCodes.OK)
+      .json({ ...cached, hasStarred: !!starRow });
   }
 
   res.status(statusCodes.OK).json({ ...cached, hasStarred: false });
@@ -260,10 +253,13 @@ export const getAllProjects = async (req, res) => {
       where: whereClause,
       include: projectInclude,
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
     return res
       .status(statusCodes.OK)
-      .json(await overlayHasStarred(rows.map(serializeProject), requesterId(req)));
+      .json(
+        await overlayHasStarred(rows.map(serializeProject), requesterId(req)),
+      );
   }
 
   // If no search query, use the standard cached Explore page
@@ -281,22 +277,39 @@ export const getAllProjects = async (req, res) => {
     .json(await overlayHasStarred(projects, requesterId(req)));
 };
 
+export const getFeaturedProjects = async (req, res) => {
+  const projects = await getOrSetCache(FEATURED_CACHE_KEY, 300, async () => {
+    const rows = await prisma.project.findMany({
+      where: {
+        isPublic: true,
+        user: { isPublic: true },
+      },
+      include: projectInclude,
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+    return rows.map(serializeProject);
+  });
+
+  res.status(statusCodes.OK).json(projects);
+};
+
 export const getStarredProjects = async (req, res) => {
   const userId = requesterId(req);
   const stars = await prisma.star.findMany({
     where: { userId },
     include: {
       project: {
-        include: {
-          ...projectInclude,
-          _count: { select: { stars: true } },
-          stars: { where: { userId } },
-        },
+        include: projectInclude,
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const projects = stars.map((star) => serializeProject(star.project));
+  const projects = stars.map((star) => ({
+    ...serializeProject(star.project),
+    hasStarred: true, // every project here IS starred, by definition — no check needed
+  }));
+
   res.status(statusCodes.OK).json(projects);
 };

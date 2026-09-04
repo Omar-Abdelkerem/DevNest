@@ -7,6 +7,7 @@ import {
   updateProjectById,
   deleteProjectById,
   getAllProjects,
+  getFeaturedProjects,
   getStarredProjects,
 } from "../controller/project.controller.js";
 import prisma from "../config/prisma.client.js";
@@ -35,6 +36,7 @@ router.get("/", optionalAuthMiddleware, getAllProjects);
 router.patch("/:id", authMiddleware, checkProjectOwnership, updateProjectById);
 router.delete("/:id", authMiddleware, checkProjectOwnership, deleteProjectById);
 router.get("/starred/me", authMiddleware, getStarredProjects);
+router.get("/featured", getFeaturedProjects);
 router.get("/:id", optionalAuthMiddleware, getProjectById);
 router.get("/:id/comments", optionalAuthMiddleware, getAllCommentsByProjectId);
 router.post("/:id/star", authMiddleware, addStar);
