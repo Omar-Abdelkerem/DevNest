@@ -52,7 +52,7 @@ export const serializeProject = (project) => {
   if (!project) return project;
   const rows = project.projectLanguages || [];
   const languageNames = rows.map((row) => row.language?.name).filter(Boolean);
-  const { projectLanguages, stars, ...rest } = project; // Extract stars array
+  const { projectLanguages, ...rest } = project;
   return {
     ...rest,
     languages: languageNames,
@@ -60,7 +60,6 @@ export const serializeProject = (project) => {
     user: project.user || null,
     owner: project.user || null,
     stars: project._count?.stars ?? 0,
-    hasStarred: Array.isArray(stars) && stars.length > 0, // Defines the UI state
   };
 };
 
@@ -107,9 +106,12 @@ export const addProject = async (req, res) => {
     });
   });
 
-  // Use the username already present in the JWT — avoids an extra DB round-trip.
-  const username = req.user?.username;
-  await invalidateOwnerPublicCache("projects", username);
+  // Fetch the real username from DB — req.user only contains { userId, createdAt }.
+  const owner = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true },
+  });
+  await invalidateOwnerPublicCache("projects", owner?.username);
   res.status(statusCodes.CREATED).json(serializeProject(project));
 };
 
@@ -131,10 +133,14 @@ export const updateProjectById = async (req, res) => {
     });
   });
 
-  const username = req.user?.username;
+  // Use req.resource.userId (the project owner) — req.user only contains { userId, createdAt }.
+  const owner = await prisma.user.findUnique({
+    where: { id: req.resource.userId },
+    select: { username: true },
+  });
   // Invalidate both the list cache and the single-project cache in one RTT.
   await Promise.all([
-    invalidateOwnerPublicCache("projects", username),
+    invalidateOwnerPublicCache("projects", owner?.username),
     deleteCache(projectCacheKey(req.resource.id)),
   ]);
   res.status(statusCodes.OK).json(serializeProject(project));
@@ -144,10 +150,14 @@ export const deleteProjectById = async (req, res) => {
   await prisma.project.delete({
     where: { id: req.resource.id },
   });
-  const username = req.user?.username;
+  // Use req.resource.userId (the project owner) — req.user only contains { userId, createdAt }.
+  const owner = await prisma.user.findUnique({
+    where: { id: req.resource.userId },
+    select: { username: true },
+  });
   // Invalidate both the list cache and the single-project cache in one RTT.
   await Promise.all([
-    invalidateOwnerPublicCache("projects", username),
+    invalidateOwnerPublicCache("projects", owner?.username),
     deleteCache(projectCacheKey(req.resource.id)),
   ]);
   res.status(statusCodes.NO_CONTENT).send();
