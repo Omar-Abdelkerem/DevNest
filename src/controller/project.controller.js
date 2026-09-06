@@ -25,7 +25,7 @@ export const projectInclude = {
 const requesterId = (req) => req.user?.userId || req.user?.id || null;
 
 /** Canonical Redis key for a single cached project (user-agnostic). */
-const projectCacheKey = (id) => `project:id:${id}:v1`;
+const projectCacheKey = (id) => `project:id:${id}:v2`;
 
 /** Canonical Redis key for the landing-page featured slice. */
 const FEATURED_CACHE_KEY = "projects:featured:v2";
