@@ -60,8 +60,13 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: "insensitive",
+      },
+    },
     select: {
       ...safeUserSelect,
       passwordHash: true,

@@ -127,6 +127,25 @@ export function createInMemoryPrisma() {
         }
         return hydrateUser(found, { select });
       },
+      findFirst: async ({ where, select }) => {
+        let found = null;
+        for (const u of store.users.values()) {
+          if (where.email?.equals) {
+            const match =
+              where.email.mode === "insensitive"
+                ? u.email.toLowerCase() === where.email.equals.toLowerCase()
+                : u.email === where.email.equals;
+            if (match) {
+              found = u;
+              break;
+            }
+          } else if (where.email && u.email === where.email) {
+            found = u;
+            break;
+          }
+        }
+        return hydrateUser(found, { select });
+      },
       update: async ({ where, data, select }) => {
         const user = store.users.get(where.id);
         if (!user) {
