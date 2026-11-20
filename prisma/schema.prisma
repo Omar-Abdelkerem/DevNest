@@ -12,45 +12,54 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  username     String    @unique
-  email        String    @unique
-  passwordHash String
-  bio          String?
-  about   String?
-  avatarUrl    String?
-  links        Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  isPublic     Boolean   @default(true)
-  projects     Project[]
-  skills       Skill[]
-  followers         Follow[]           @relation("following")
-  following         Follow[]           @relation("follower")
-  comments          Comment[]
-  stars             Star[]
-  feedbackGiven     ProfileFeedback[]  @relation("feedbackAuthor")
-  feedbackReceived  ProfileFeedback[]  @relation("feedbackRecipient")
+  id               String            @id @default(uuid())
+  username         String            @unique
+  email            String            @unique
+  passwordHash     String
+  bio              String?
+  about            String?
+  location         String?
+  age              Int?
+  role             String?
+  company          String?
+  availableForWork Boolean           @default(false)
+  avatarUrl        String?
+  links            Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  isPublic         Boolean           @default(true)
+  projects         Project[]
+  skills           Skill[]
+  followers        Follow[]          @relation("following")
+  following        Follow[]          @relation("follower")
+  comments         Comment[]
+  stars            Star[]
+  feedbackGiven    ProfileFeedback[] @relation("feedbackAuthor")
+  feedbackReceived ProfileFeedback[] @relation("feedbackRecipient")
+
+  @@index([isPublic])
 }
 
 model Project {
-  id            String         @id @default(uuid())
-  title         String
-  description   String?
-  projectimgUrl String?
-  links         Json?
-  readme        String?
-  isPublic      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  projectimgUrl    String?
+  links            Json?
+  readme           String?
+  isPublic         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   userId           String
   projectLanguages ProjectLanguage[]
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments         Comment[]
   stars            Star[]
   projectSkills    ProjectSkill[]
 
   @@index([userId])
+  @@index([isPublic, createdAt(sort: Desc)])
+  @@index([userId, isPublic, createdAt(sort: Desc)])
 }
 
 enum SkillLevel {
@@ -65,7 +74,7 @@ model Skill {
   name          String
   level         SkillLevel
   userId        String
-  user          User           @relation(fields: [userId], references: [id])
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectSkills ProjectSkill[]
 
   @@index([userId])
@@ -95,6 +104,7 @@ model Comment {
 
   @@index([projectId])
   @@index([userId])
+  @@index([projectId, createdAt])
 }
 
 model ProfileFeedback {
@@ -108,6 +118,7 @@ model ProfileFeedback {
 
   @@index([authorId])
   @@index([recipientId])
+  @@index([recipientId, createdAt(sort: Desc)])
 }
 
 model Star {

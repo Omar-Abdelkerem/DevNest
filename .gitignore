@@ -1,6 +1,14 @@
 node_modules/
 .env
+.env.*
+!.env.example
 coverage/
+logs/
+*.log
 .DS_Store
 .prisma
 generated/
+.vscode/
+.idea/
+dist/
+build/

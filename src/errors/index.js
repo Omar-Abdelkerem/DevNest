@@ -6,6 +6,7 @@ import unauthorizedError from "./unauthorized.error.js";
 
 export {
   appError,
+  appError as AppError,
   badRequestError,
   notFoundError,
   unauthenticatedError,

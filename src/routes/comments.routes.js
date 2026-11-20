@@ -1,6 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
+import { writeLimiter } from "../config/rateLimiter.js";
 import {
   addComment,
   updateCommentById,
@@ -13,9 +14,7 @@ import { commentIdSchema } from "../schemas/comments.schema.js";
 
 const routeResource = async (id) => {
   return prisma.comment.findUnique({
-    where: {
-      id: id,
-    },
+    where: { id },
   });
 };
 
@@ -27,7 +26,7 @@ const checkCommentOwnership = checkOwnership(
 
 const router = express.Router();
 
-router.post("/", authMiddleware, addComment);
+router.post("/", authMiddleware, writeLimiter, addComment);
 router.patch("/:id", authMiddleware, checkCommentOwnership, updateCommentById);
 router.delete("/:id", authMiddleware, checkCommentOwnership, deleteCommentById);
 router.get("/:id", optionalAuthMiddleware, getCommentById);

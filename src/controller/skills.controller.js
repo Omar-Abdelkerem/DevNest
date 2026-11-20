@@ -1,11 +1,12 @@
-import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
+import prisma from "../config/prisma.client.js";
 import { notFoundError, unauthorizedError } from "../errors/index.js";
 import {
   addSkillSchema,
   updateSkillSchema,
   skillIdSchema,
 } from "../schemas/skills.schema.js";
+import { setCacheHeaders } from "../middleware/cache-headers.middleware.js";
 
 export const addSkill = async (req, res) => {
   const validatedData = addSkillSchema.parse(req.body);
@@ -35,35 +36,52 @@ export const getSkillById = async (req, res) => {
   const { id } = skillIdSchema.parse(req.params);
 
   const skill = await prisma.skill.findUnique({
-    where: { id: id },
+    where: { id },
     include: { user: { select: { isPublic: true } } },
   });
 
   if (!skill) {
     throw new notFoundError(`Skill with id ${id} not found`);
   }
-  if (!skill.user.isPublic && skill.userId !== req.user.userId) {
+
+  const requesterId = req.user?.userId || req.user?.id;
+  if (!skill.user.isPublic && skill.userId !== requesterId) {
     throw new unauthorizedError("This profile is private.");
   }
 
+  setCacheHeaders(res, {
+    isPublic: skill.user.isPublic,
+    isAuthenticated: Boolean(requesterId),
+    maxAge: 60,
+  });
   res.status(statusCodes.OK).json(skill);
 };
 
 export const getAllSkillsbyUsername = async (req, res) => {
   const { username } = req.params;
   const user = await prisma.user.findUnique({
-    where: { username: username },
+    where: { username },
+    select: { id: true, isPublic: true },
   });
 
   if (!user) {
     throw new notFoundError(`User with username ${username} not found`);
   }
-  if (!user.isPublic && user.id !== req.user?.userId) {
+
+  const requesterId = req.user?.userId || req.user?.id;
+  if (!user.isPublic && user.id !== requesterId) {
     throw new unauthorizedError("This profile is private.");
   }
 
   const skills = await prisma.skill.findMany({
     where: { userId: user.id },
+    take: 50,
+  });
+
+  setCacheHeaders(res, {
+    isPublic: user.isPublic,
+    isAuthenticated: Boolean(requesterId),
+    maxAge: 60,
   });
   res.status(statusCodes.OK).json(skills);
 };

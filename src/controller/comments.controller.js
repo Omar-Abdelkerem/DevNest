@@ -1,7 +1,7 @@
-import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
+import prisma from "../config/prisma.client.js";
 import { notFoundError, unauthorizedError } from "../errors/index.js";
-import getOrSetCache from "../utils/cache.util.js";
+import getOrSetCache, { CACHE_KEYS } from "../utils/cache.util.js";
 import {
   addCommentSchema,
   updateCommentSchema,
@@ -9,9 +9,7 @@ import {
 } from "../schemas/comments.schema.js";
 import { projectIdSchema } from "../schemas/project.schema.js";
 import { projectInclude, serializeProject } from "./project.controller.js";
-
-/** Must mirror project.controller.js so we read from the same cache key. */
-const projectCacheKey = (id) => `project:id:${id}:v1`;
+import { setCacheHeaders } from "../middleware/cache-headers.middleware.js";
 
 export const addComment = async (req, res) => {
   const validatedData = addCommentSchema.parse(req.body);
@@ -36,6 +34,9 @@ export const addComment = async (req, res) => {
 
   const comment = await prisma.comment.create({
     data: { ...validatedData, userId: req.user.userId },
+    include: {
+      user: { select: { id: true, username: true, avatarUrl: true } },
+    },
   });
   res.status(statusCodes.CREATED).json(comment);
 };
@@ -55,6 +56,7 @@ export const deleteCommentById = async (req, res) => {
   });
   res.status(statusCodes.NO_CONTENT).send();
 };
+
 export const getCommentById = async (req, res) => {
   const { id } = commentIdSchema.parse(req.params);
 
@@ -75,29 +77,35 @@ export const getCommentById = async (req, res) => {
     throw new notFoundError(`Comment with id ${id} not found`);
   }
 
-  const isOwner = comment.project.userId === req.user.userId;
+  const requesterId = req.user?.userId || req.user?.id;
+  const isOwner = comment.project.userId === requesterId;
   const isVisible = comment.project.isPublic && comment.project.user.isPublic;
 
   if (!isVisible && !isOwner) {
     throw new unauthorizedError("This project is private.");
   }
 
+  setCacheHeaders(res, {
+    isPublic: isVisible,
+    isAuthenticated: Boolean(requesterId),
+    maxAge: 30,
+  });
   res.status(statusCodes.OK).json(comment);
 };
+
 export const getAllCommentsByProjectId = async (req, res) => {
   const { id } = projectIdSchema.parse(req.params);
 
-  // Try to read the project from the shared cache first (populated by getProjectById).
-  // Falls back to a DB query if the cache is cold — avoids a second RTT on the hot path.
+  // Uses the exact same shared v2 cache key as project.controller.js
   const project = await getOrSetCache(
-    projectCacheKey(id),
+    CACHE_KEYS.projectById(id),
     3600,
     async () => {
       const row = await prisma.project.findUnique({
         where: { id },
         include: projectInclude,
       });
-      return serializeProject(row);
+      return row ? serializeProject(row) : null;
     },
   );
 
@@ -107,13 +115,17 @@ export const getAllCommentsByProjectId = async (req, res) => {
 
   const requesterId = req.user?.userId || req.user?.id;
   const isOwner = project.userId === requesterId;
-  // Cached project stores isPublic on `owner` (serialized) or directly on `user`.
-  const ownerIsPublic = project.owner?.isPublic ?? project.user?.isPublic ?? false;
-  const isVisible = project.isPublic && ownerIsPublic;
+  const ownerIsPublic =
+    project.owner?.isPublic ?? project.user?.isPublic ?? false;
+  const isVisible = Boolean(project.isPublic && ownerIsPublic);
 
   if (!isVisible && !isOwner) {
     throw new unauthorizedError("This project is private.");
   }
+
+  const rawLimit = parseInt(req.query?.limit, 10);
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
 
   const comments = await prisma.comment.findMany({
     where: { projectId: id },
@@ -121,7 +133,13 @@ export const getAllCommentsByProjectId = async (req, res) => {
       user: { select: { id: true, username: true, avatarUrl: true } },
     },
     orderBy: { createdAt: "asc" },
+    take: limit,
   });
 
+  setCacheHeaders(res, {
+    isPublic: isVisible,
+    isAuthenticated: Boolean(requesterId),
+    maxAge: 30,
+  });
   res.status(statusCodes.OK).json(comments);
 };

@@ -1,5 +1,5 @@
-import prisma from "../config/prisma.client.js";
 import statusCodes from "http-status-codes";
+import prisma from "../config/prisma.client.js";
 import { hashPassword } from "../utils/password-hashing.util.js";
 import {
   notFoundError,
@@ -7,22 +7,37 @@ import {
   unauthorizedError,
 } from "../errors/index.js";
 import { updateUserSchema, userIdSchema } from "../schemas/user.schema.js";
+import { invalidateAllUserSessions } from "../utils/session.util.js";
+import invalidateOwnerPublicCache from "../utils/invalidateOwnerPublicCache.js";
+import { setCacheHeaders } from "../middleware/cache-headers.middleware.js";
+
+const publicUserSelect = {
+  id: true,
+  username: true,
+  bio: true,
+  about: true,
+  location: true,
+  age: true,
+  role: true,
+  company: true,
+  availableForWork: true,
+  avatarUrl: true,
+  links: true,
+  isPublic: true,
+  createdAt: true,
+  _count: { select: { followers: true, following: true } },
+};
+
+const privateUserSelect = {
+  ...publicUserSelect,
+  email: true,
+};
 
 export const getUserById = async (req, res) => {
   const { id } = userIdSchema.parse(req.params);
   const user = await prisma.user.findUnique({
-    where: { id: id },
-    select: {
-      id: true,
-      username: true,
-      bio: true,
-      about: true,
-      avatarUrl: true,
-      links: true,
-      isPublic: true,
-      createdAt: true,
-      _count: { select: { followers: true, following: true } },
-    },
+    where: { id },
+    select: publicUserSelect,
   });
 
   if (!user) {
@@ -32,26 +47,20 @@ export const getUserById = async (req, res) => {
     throw new unauthorizedError("This profile is private.");
   }
 
+  setCacheHeaders(res, {
+    isPublic: user.isPublic,
+    isAuthenticated: Boolean(req.user),
+    maxAge: 60,
+  });
   res.status(statusCodes.OK).json({ user });
 };
 
-// NEW: Fetch by username for public profiles
 export const getUserByUsername = async (req, res) => {
-  const { username } = req.params; // No UUID schema validation here!
+  const { username } = req.params;
 
   const user = await prisma.user.findUnique({
-    where: { username: username },
-    select: {
-      id: true,
-      username: true,
-      bio: true,
-      about: true,
-      avatarUrl: true,
-      links: true,
-      isPublic: true,
-      createdAt: true,
-      _count: { select: { followers: true, following: true } },
-    },
+    where: { username },
+    select: publicUserSelect,
   });
 
   if (!user) {
@@ -63,44 +72,42 @@ export const getUserByUsername = async (req, res) => {
     throw new unauthorizedError("This profile is private.");
   }
 
+  setCacheHeaders(res, {
+    isPublic: user.isPublic,
+    isAuthenticated: Boolean(requesterId),
+    maxAge: 60,
+  });
   res.status(statusCodes.OK).json({ user });
 };
 
 export const getCurrentUser = async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.userId },
-    select: {
-      id: true,
-      username: true,
-      bio: true,
-      about: true,
-      avatarUrl: true,
-      links: true,
-      isPublic: true,
-      createdAt: true,
-      _count: { select: { followers: true, following: true } },
-    },
+    select: privateUserSelect,
   });
 
   if (!user) {
     throw new notFoundError(`User with id ${req.user.userId} not found`);
   }
 
+  setCacheHeaders(res, { isPublic: false, isAuthenticated: true });
   res.status(statusCodes.OK).json({ user });
 };
 
 export const updateCurrentUser = async (req, res) => {
-  const { skills } = req.body;
-
   const validatedData = updateUserSchema.parse(req.body);
-  const { password, ...otherData } = validatedData;
+  const { password, skills, ...otherData } = validatedData;
+
+  const existing = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { username: true },
+  });
 
   if (password) {
     otherData.passwordHash = await hashPassword(password);
   }
 
-  // Map the dynamic name and level straight into Prisma
-  if (skills && Array.isArray(skills)) {
+  if (skills !== undefined) {
     otherData.skills = {
       deleteMany: {},
       create: skills.map((skill) => ({
@@ -113,24 +120,26 @@ export const updateCurrentUser = async (req, res) => {
   const updatedUser = await prisma.user.update({
     where: { id: req.user.userId },
     data: otherData,
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      bio: true,
-      about: true,
-      avatarUrl: true,
-      links: true,
-      isPublic: true,
-      createdAt: true,
-    },
+    select: privateUserSelect,
   });
 
+  // Security: changing password invalidates all other active sessions for this account
+  if (password) {
+    await invalidateAllUserSessions(req.user.userId, req.cookies?.sessionId);
+  }
+
+  // Invalidate cached project lists (username, avatar, or visibility may have changed)
+  await invalidateOwnerPublicCache("projects", existing?.username);
+  if (updatedUser.username && updatedUser.username !== existing?.username) {
+    await invalidateOwnerPublicCache("projects", updatedUser.username);
+  }
+
+  setCacheHeaders(res, { isPublic: false, isAuthenticated: true });
   res.status(statusCodes.OK).json({ user: updatedUser });
 };
 
 export const updateAvatar = async (req, res) => {
-  if (!req.file) {
+  if (!req.file?.path) {
     throw new badRequestError("No image file was uploaded.");
   }
 
@@ -139,17 +148,10 @@ export const updateAvatar = async (req, res) => {
   const updatedUser = await prisma.user.update({
     where: { id: req.user.userId },
     data: { avatarUrl },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      bio: true,
-      about: true,
-      avatarUrl: true,
-      isPublic: true,
-      createdAt: true,
-    },
+    select: privateUserSelect,
   });
 
+  await invalidateOwnerPublicCache("projects", updatedUser.username);
+  setCacheHeaders(res, { isPublic: false, isAuthenticated: true });
   res.status(statusCodes.OK).json({ user: updatedUser });
 };
