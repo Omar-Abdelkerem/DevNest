@@ -1,7 +1,10 @@
-FROM node:22-alpine AS base
+FROM node:22-slim AS base
 WORKDIR /app
 
-# Install all dependencies (prisma CLI is needed for generate & migrate deploy)
+# Install OpenSSL required by Prisma query engine
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Copy manifests and install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -14,10 +17,6 @@ RUN npx prisma generate
 COPY src ./src
 
 ENV NODE_ENV=production
-ENV PORT=3000
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
-
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+CMD ["node", "src/server.js"]
