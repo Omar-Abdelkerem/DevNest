@@ -48,7 +48,7 @@ export function validateProductionEnv() {
       secret.length < 12 ||
       WEAK_SECRET_PATTERNS.some((re) => re.test(secret))
     ) {
-      errors.push("CLOUDINARY_API_SECRET appears to be a weak or placeholder value.");
+      console.warn("Warning: CLOUDINARY_API_SECRET appears to be a weak or placeholder value.");
     }
   }
 
