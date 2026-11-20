@@ -1,30 +1,31 @@
 import { createClient } from "redis";
+import "dotenv/config";
 
 const isTest = process.env.NODE_ENV === "test";
 const redisUrl = process.env.REDIS_URL;
 
 let redisReady = false;
-let hasLoggedOffline = false;
 
-const client = createClient({
-  url: redisUrl || "redis://127.0.0.1:6379",
-  socket: {
-    connectTimeout: 2000,
-    reconnectStrategy: (retries) => {
-      if (isTest || retries > 5) {
-        return false; // Stop reconnecting in test/offline mode; fallback kicks in
+const client = createClient(
+  isTest
+    ? {
+        url: redisUrl || "redis://127.0.0.1:6379",
+        socket: { connectTimeout: 500, reconnectStrategy: () => false },
       }
-      return Math.min(retries * 250, 2000);
-    },
-  },
-});
+    : {
+        url: redisUrl,
+      },
+);
 
 client.on("ready", () => {
   redisReady = true;
-  hasLoggedOffline = false;
   if (!isTest) {
     console.log("Connected to Redis");
   }
+});
+
+client.on("connect", () => {
+  redisReady = true;
 });
 
 client.on("end", () => {
@@ -33,18 +34,18 @@ client.on("end", () => {
 
 client.on("error", (err) => {
   redisReady = false;
-  if (!isTest && !hasLoggedOffline) {
-    hasLoggedOffline = true;
-    console.warn("Redis unavailable; falling back to in-memory store:", err.message);
+  if (!isTest) {
+    console.error("Redis Client Error", err.message);
   }
 });
 
 if (!isTest && redisUrl) {
-  client.connect().catch(() => {
+  client.connect().catch((err) => {
     redisReady = false;
+    console.error("Failed to connect to Redis on startup:", err.message);
   });
 }
 
-export const isRedisReady = () => redisReady && client.isReady;
+export const isRedisReady = () => Boolean(redisReady && (client.isReady || client.isOpen));
 
 export default client;
