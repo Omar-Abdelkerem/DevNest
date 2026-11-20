@@ -7,6 +7,12 @@ export const userIdSchema = z
   })
   .strict();
 
+const optionalTrimmedString = (max, msg) =>
+  z
+    .union([z.string().trim().max(max, msg), z.null()])
+    .transform((val) => (val === "" ? null : val))
+    .optional();
+
 export const updateUserSchema = z
   .object({
     username: z
@@ -20,50 +26,31 @@ export const updateUserSchema = z
       )
       .optional(),
     email: z.string().trim().email("Invalid email address").max(255).optional(),
-    bio: z
-      .string()
-      .trim()
-      .max(160, { message: "Bio cannot exceed 160 characters." })
-      .optional()
-      .nullable(),
-    about: z
-      .string()
-      .trim()
-      .max(1500, "About section cannot exceed 1500 characters.")
-      .optional()
-      .nullable(),
-    location: z
-      .string()
-      .trim()
-      .max(100, "Location cannot exceed 100 characters.")
-      .optional()
-      .nullable(),
+    bio: optionalTrimmedString(160, "Bio cannot exceed 160 characters."),
+    about: optionalTrimmedString(1500, "About section cannot exceed 1500 characters."),
+    location: optionalTrimmedString(100, "Location cannot exceed 100 characters."),
     age: z
-      .number()
-      .int("Age must be a whole number")
-      .min(13, "Age must be at least 13")
-      .max(120, "Age must be at most 120")
-      .optional()
-      .nullable(),
-    role: z
-      .string()
-      .trim()
-      .max(80, "Role cannot exceed 80 characters.")
-      .optional()
-      .nullable(),
-    company: z
-      .string()
-      .trim()
-      .max(80, "Company cannot exceed 80 characters.")
-      .optional()
-      .nullable(),
+      .union([
+        z
+          .number()
+          .int("Age must be a whole number")
+          .min(13, "Age must be at least 13")
+          .max(120, "Age must be at most 120"),
+        z.null(),
+      ])
+      .optional(),
+    role: optionalTrimmedString(80, "Role cannot exceed 80 characters."),
+    company: optionalTrimmedString(80, "Company cannot exceed 80 characters."),
     availableForWork: z.boolean().optional(),
     password: z
       .string()
       .min(6, "Password must be at least 6 characters long")
       .max(20, "Password must be at most 20 characters long")
       .optional(),
-    avatarUrl: safeHttpUrl.optional().nullable(),
+    avatarUrl: z
+      .union([safeHttpUrl, z.literal(""), z.null()])
+      .transform((val) => (val === "" ? null : val))
+      .optional(),
     links: z.array(safeHttpUrl).max(10, "Maximum 10 links allowed").optional(),
     isPublic: z.boolean().optional(),
     skills: z

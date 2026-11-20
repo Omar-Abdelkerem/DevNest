@@ -1,9 +1,9 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 
-# Install dependencies cleanly
+# Install all dependencies (prisma CLI is needed for generate & migrate deploy)
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Copy Prisma schema & generate client
 COPY prisma ./prisma
@@ -20,4 +20,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
