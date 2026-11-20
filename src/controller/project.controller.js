@@ -11,6 +11,7 @@ import {
   addProjectSchema,
   updateProjectSchema,
   projectIdSchema,
+  reorderProjectsSchema,
 } from "../schemas/project.schema.js";
 import { setCacheHeaders } from "../middleware/cache-headers.middleware.js";
 
@@ -33,6 +34,15 @@ const ownerSelect = {
   username: true,
   avatarUrl: true,
   isPublic: true,
+  headline: true,
+  role: true,
+  company: true,
+  availableForWork: true,
+  phone: true,
+  whatsapp: true,
+  contactEmail: true,
+  resumeUrl: true,
+  links: true,
 };
 
 export const projectInclude = {
@@ -133,6 +143,8 @@ export const addProject = async (req, res) => {
         links: projectData.links ?? [],
         readme: projectData.readme ?? null,
         isPublic: projectData.isPublic ?? true,
+        isPinned: projectData.isPinned ?? false,
+        sortOrder: projectData.sortOrder ?? 0,
         userId,
       },
     });
@@ -145,7 +157,6 @@ export const addProject = async (req, res) => {
     });
   });
 
-  // Owner username is already loaded via projectInclude — avoids a redundant DB query
   await invalidateOwnerPublicCache("projects", project?.user?.username);
   res.status(statusCodes.CREATED).json(serializeProject(project));
 };
@@ -173,6 +184,38 @@ export const updateProjectById = async (req, res) => {
     deleteCache(CACHE_KEYS.projectById(req.resource.id)),
   ]);
   res.status(statusCodes.OK).json(serializeProject(project));
+};
+
+export const reorderProjects = async (req, res) => {
+  const { projectIds } = reorderProjectsSchema.parse(req.body);
+  const userId = requesterId(req);
+
+  const ownedProjects = await prisma.project.findMany({
+    where: { userId, id: { in: projectIds } },
+    select: { id: true, user: { select: { username: true } } },
+  });
+
+  const ownedIdSet = new Set(ownedProjects.map((p) => p.id));
+  const validOrderedIds = projectIds.filter((id) => ownedIdSet.has(id));
+
+  if (validOrderedIds.length > 0) {
+    await prisma.$transaction(
+      validOrderedIds.map((id, index) =>
+        prisma.project.update({
+          where: { id },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+  }
+
+  const ownerUsername = ownedProjects[0]?.user?.username;
+  if (ownerUsername) {
+    await invalidateOwnerPublicCache("projects", ownerUsername);
+  }
+
+  setCacheHeaders(res, { isPublic: false, isAuthenticated: true });
+  res.status(statusCodes.OK).json({ reordered: validOrderedIds.length });
 };
 
 export const deleteProjectById = async (req, res) => {
@@ -264,7 +307,11 @@ export const getAllProjectsByUsername = async (req, res) => {
     const rows = await prisma.project.findMany({
       where,
       include: projectInclude,
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { isPinned: "desc" },
+        { sortOrder: "asc" },
+        { createdAt: "desc" },
+      ],
       skip,
       take: limit,
     });
@@ -364,7 +411,7 @@ export const getFeaturedProjects = async (req, res) => {
           user: { isPublic: true },
         },
         include: projectInclude,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
         take: 3,
       });
       return rows.map(serializeProject);

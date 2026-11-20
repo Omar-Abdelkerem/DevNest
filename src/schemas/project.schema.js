@@ -44,6 +44,8 @@ export const addProjectSchema = z
       .optional()
       .nullable(),
     isPublic: z.boolean().optional(),
+    isPinned: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).max(10000).optional(),
     languages: z
       .array(z.string().trim().min(1).max(40))
       .max(15, "Maximum 15 languages allowed")
@@ -76,9 +78,20 @@ export const updateProjectSchema = z
       .optional()
       .nullable(),
     isPublic: z.boolean().optional(),
+    isPinned: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).max(10000).optional(),
     languages: z
       .array(z.string().trim().min(1).max(40))
       .max(15, "Maximum 15 languages allowed")
       .optional(),
+  })
+  .strict();
+
+export const reorderProjectsSchema = z
+  .object({
+    projectIds: z
+      .array(z.string().uuid("Invalid project ID"))
+      .min(1, "At least one project ID is required")
+      .max(100, "Maximum 100 projects can be reordered at once"),
   })
   .strict();

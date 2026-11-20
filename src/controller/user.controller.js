@@ -14,12 +14,20 @@ import { setCacheHeaders } from "../middleware/cache-headers.middleware.js";
 const publicUserSelect = {
   id: true,
   username: true,
+  headline: true,
   bio: true,
   about: true,
   location: true,
   age: true,
   role: true,
   company: true,
+  education: true,
+  yearsOfExperience: true,
+  workPreferences: true,
+  phone: true,
+  whatsapp: true,
+  contactEmail: true,
+  resumeUrl: true,
   availableForWork: true,
   avatarUrl: true,
   links: true,
@@ -75,7 +83,6 @@ export const getUserByUsername = async (req, res) => {
   setCacheHeaders(res, {
     isPublic: user.isPublic,
     isAuthenticated: Boolean(requesterId),
-    maxAge: 60,
   });
   res.status(statusCodes.OK).json({ user });
 };

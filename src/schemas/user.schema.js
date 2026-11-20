@@ -26,6 +26,7 @@ export const updateUserSchema = z
       )
       .optional(),
     email: z.string().trim().email("Invalid email address").max(255).optional(),
+    headline: optionalTrimmedString(120, "Headline cannot exceed 120 characters."),
     bio: optionalTrimmedString(160, "Bio cannot exceed 160 characters."),
     about: optionalTrimmedString(1500, "About section cannot exceed 1500 characters."),
     location: optionalTrimmedString(100, "Location cannot exceed 100 characters."),
@@ -41,6 +42,32 @@ export const updateUserSchema = z
       .optional(),
     role: optionalTrimmedString(80, "Role cannot exceed 80 characters."),
     company: optionalTrimmedString(80, "Company cannot exceed 80 characters."),
+    education: optionalTrimmedString(120, "Education cannot exceed 120 characters."),
+    yearsOfExperience: z
+      .union([
+        z
+          .number()
+          .int("Years of experience must be a whole number")
+          .min(0, "Years of experience cannot be negative")
+          .max(60, "Years of experience cannot exceed 60"),
+        z.null(),
+      ])
+      .optional(),
+    workPreferences: optionalTrimmedString(120, "Work preferences cannot exceed 120 characters."),
+    phone: optionalTrimmedString(40, "Phone number cannot exceed 40 characters."),
+    whatsapp: optionalTrimmedString(100, "WhatsApp cannot exceed 100 characters."),
+    contactEmail: z
+      .union([
+        z.string().trim().email("Invalid contact email").max(255),
+        z.literal(""),
+        z.null(),
+      ])
+      .transform((val) => (val === "" ? null : val))
+      .optional(),
+    resumeUrl: z
+      .union([safeHttpUrl, z.literal(""), z.null()])
+      .transform((val) => (val === "" ? null : val))
+      .optional(),
     availableForWork: z.boolean().optional(),
     password: z
       .string()

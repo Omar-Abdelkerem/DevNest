@@ -7,6 +7,7 @@ import {
   addProject,
   getProjectById,
   updateProjectById,
+  reorderProjects,
   deleteProjectById,
   getAllProjects,
   getFeaturedProjects,
@@ -38,6 +39,7 @@ router.post("/", authMiddleware, writeLimiter, addProject);
 router.get("/", optionalAuthMiddleware, getAllProjects);
 router.get("/starred/me", authMiddleware, getStarredProjects);
 router.get("/featured", getFeaturedProjects);
+router.patch("/reorder", authMiddleware, writeLimiter, reorderProjects);
 router.get("/:id", optionalAuthMiddleware, getProjectById);
 router.patch("/:id", authMiddleware, checkProjectOwnership, updateProjectById);
 router.delete("/:id", authMiddleware, checkProjectOwnership, deleteProjectById);

@@ -12,30 +12,38 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(uuid())
-  username         String            @unique
-  email            String            @unique
-  passwordHash     String
-  bio              String?
-  about            String?
-  location         String?
-  age              Int?
-  role             String?
-  company          String?
-  availableForWork Boolean           @default(false)
-  avatarUrl        String?
-  links            Json?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  isPublic         Boolean           @default(true)
-  projects         Project[]
-  skills           Skill[]
-  followers        Follow[]          @relation("following")
-  following        Follow[]          @relation("follower")
-  comments         Comment[]
-  stars            Star[]
-  feedbackGiven    ProfileFeedback[] @relation("feedbackAuthor")
-  feedbackReceived ProfileFeedback[] @relation("feedbackRecipient")
+  id                String            @id @default(uuid())
+  username          String            @unique
+  email             String            @unique
+  passwordHash      String
+  headline          String?
+  bio               String?
+  about             String?
+  location          String?
+  age               Int?
+  role              String?
+  company           String?
+  education         String?
+  yearsOfExperience Int?
+  workPreferences   String?
+  phone             String?
+  whatsapp          String?
+  contactEmail      String?
+  resumeUrl         String?
+  availableForWork  Boolean           @default(false)
+  avatarUrl         String?
+  links             Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  isPublic          Boolean           @default(true)
+  projects          Project[]
+  skills            Skill[]
+  followers         Follow[]          @relation("following")
+  following         Follow[]          @relation("follower")
+  comments          Comment[]
+  stars             Star[]
+  feedbackGiven     ProfileFeedback[] @relation("feedbackAuthor")
+  feedbackReceived  ProfileFeedback[] @relation("feedbackRecipient")
 
   @@index([isPublic])
 }
@@ -48,6 +56,8 @@ model Project {
   links            Json?
   readme           String?
   isPublic         Boolean           @default(true)
+  isPinned         Boolean           @default(false)
+  sortOrder        Int               @default(0)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   userId           String
@@ -60,6 +70,7 @@ model Project {
   @@index([userId])
   @@index([isPublic, createdAt(sort: Desc)])
   @@index([userId, isPublic, createdAt(sort: Desc)])
+  @@index([userId, isPinned(sort: Desc), sortOrder(sort: Asc)])
 }
 
 enum SkillLevel {
@@ -141,6 +152,7 @@ model ProjectSkill {
   @@id([projectId, skillId])
   @@index([skillId])
 }
+
 model Language {
   id               String            @id @default(uuid())
   name             String            @unique
