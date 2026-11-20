@@ -42,6 +42,7 @@ const ownerSelect = {
   whatsapp: true,
   contactEmail: true,
   resumeUrl: true,
+  ctaMessage: true,
   links: true,
 };
 

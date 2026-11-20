@@ -28,6 +28,7 @@ const publicUserSelect = {
   whatsapp: true,
   contactEmail: true,
   resumeUrl: true,
+  ctaMessage: true,
   availableForWork: true,
   avatarUrl: true,
   links: true,

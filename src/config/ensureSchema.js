@@ -20,6 +20,7 @@ export async function ensureSchema() {
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "whatsapp" TEXT`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "contactEmail" TEXT`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "resumeUrl" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ctaMessage" TEXT`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "availableForWork" BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "sortOrder" INTEGER NOT NULL DEFAULT 0`,

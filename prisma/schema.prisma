@@ -30,6 +30,7 @@ model User {
   whatsapp          String?
   contactEmail      String?
   resumeUrl         String?
+  ctaMessage        String?
   availableForWork  Boolean           @default(false)
   avatarUrl         String?
   links             Json?

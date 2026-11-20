@@ -68,6 +68,7 @@ export const updateUserSchema = z
       .union([safeHttpUrl, z.literal(""), z.null()])
       .transform((val) => (val === "" ? null : val))
       .optional(),
+    ctaMessage: optionalTrimmedString(240, "CTA message cannot exceed 240 characters."),
     availableForWork: z.boolean().optional(),
     password: z
       .string()
